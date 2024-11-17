@@ -11,7 +11,7 @@ import { PreviewsStore } from './previews';
 import { TerminalStore } from './terminal';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { Octokit, type RestEndpointMethodTypes } from "@octokit/rest";
+import { Octokit, type RestEndpointMethodTypes } from '@octokit/rest';
 import * as nodePath from 'node:path';
 import type { WebContainerProcess } from '@webcontainer/api';
 
@@ -91,7 +91,6 @@ export class WorkbenchStore {
     this.#terminalStore.attachTerminal(terminal);
   }
   attachBoltTerminal(terminal: ITerminal) {
-
     this.#terminalStore.attachBoltTerminal(terminal);
   }
 
@@ -276,16 +275,21 @@ export class WorkbenchStore {
     if (!artifact) {
       unreachable('Artifact not found');
     }
+
     if (data.action.type === 'file') {
-      let wc = await webcontainer
+      const wc = await webcontainer;
       const fullPath = nodePath.join(wc.workdir, data.action.filePath);
+
       if (this.selectedFile.value !== fullPath) {
         this.setSelectedFile(fullPath);
       }
+
       if (this.currentView.value !== 'code') {
         this.currentView.set('code');
       }
+
       const doc = this.#editorStore.documents.get()[fullPath];
+
       if (!doc) {
         await artifact.runner.runAction(data, isStreaming);
       }
@@ -366,8 +370,38 @@ export class WorkbenchStore {
     return syncedFiles;
   }
 
-  async pushToGitHub(repoName: string, githubUsername: string, ghToken: string) {
+  async loadFromFileSystem(sourceHandle: FileSystemDirectoryHandle) {
+    const wc = await webcontainer;
 
+    const processDirectory = async (handle: FileSystemDirectoryHandle, currentPath: string = '') => {
+      for await (const entry of handle.values()) {
+        const entryPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+
+        if (entry.kind === 'file') {
+          const file = await entry.getFile();
+          const content = await file.text();
+
+          // Create necessary directories
+          const dirPath = nodePath.dirname(entryPath);
+
+          if (dirPath !== '.') {
+            await wc.fs.mkdir(dirPath, { recursive: true });
+          }
+
+          // Write file content and track modification
+          await wc.fs.writeFile(entryPath, content);
+          this.#filesStore.trackFileModification(entryPath, ''); // Track as new file
+        } else if (entry.kind === 'directory') {
+          await wc.fs.mkdir(entryPath, { recursive: true });
+          await processDirectory(entry, entryPath);
+        }
+      }
+    };
+
+    await processDirectory(sourceHandle);
+  }
+
+  async pushToGitHub(repoName: string, githubUsername: string, ghToken: string) {
     try {
       // Get the GitHub auth token from environment variables
       const githubToken = ghToken;
@@ -382,10 +416,11 @@ export class WorkbenchStore {
       const octokit = new Octokit({ auth: githubToken });
 
       // Check if the repository already exists before creating it
-      let repo: RestEndpointMethodTypes["repos"]["get"]["response"]['data']
+      let repo: RestEndpointMethodTypes['repos']['get']['response']['data'];
+
       try {
-        let resp = await octokit.repos.get({ owner: owner, repo: repoName });
-        repo = resp.data
+        const resp = await octokit.repos.get({ owner, repo: repoName });
+        repo = resp.data;
       } catch (error) {
         if (error instanceof Error && 'status' in error && error.status === 404) {
           // Repository doesn't exist, so create a new one
@@ -403,6 +438,7 @@ export class WorkbenchStore {
 
       // Get all files
       const files = this.files.get();
+
       if (!files || Object.keys(files).length === 0) {
         throw new Error('No files found to push');
       }
@@ -419,7 +455,7 @@ export class WorkbenchStore {
             });
             return { path: filePath.replace(/^\/home\/project\//, ''), sha: blob.sha };
           }
-        })
+        }),
       );
 
       const validBlobs = blobs.filter(Boolean); // Filter out any undefined blobs

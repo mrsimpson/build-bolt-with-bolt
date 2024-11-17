@@ -80,6 +80,12 @@ export class FilesStore {
     this.#modifiedFiles.clear();
   }
 
+  trackFileModification(filePath: string, originalContent: string) {
+    if (!this.#modifiedFiles.has(filePath)) {
+      this.#modifiedFiles.set(filePath, originalContent);
+    }
+  }
+
   async saveFile(filePath: string, content: string) {
     const webcontainer = await this.#webcontainer;
 
