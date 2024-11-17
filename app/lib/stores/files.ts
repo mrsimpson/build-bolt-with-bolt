@@ -80,12 +80,6 @@ export class FilesStore {
     this.#modifiedFiles.clear();
   }
 
-  trackFileModification(filePath: string, originalContent: string) {
-    if (!this.#modifiedFiles.has(filePath)) {
-      this.#modifiedFiles.set(filePath, originalContent);
-    }
-  }
-
   async saveFile(filePath: string, content: string) {
     const webcontainer = await this.#webcontainer;
 
@@ -117,6 +111,30 @@ export class FilesStore {
 
       throw error;
     }
+  }
+
+  async trackLoadedFile(filePath: string, content: string) {
+    const webcontainer = await this.#webcontainer;
+    const fullPath = nodePath.join(webcontainer.workdir, filePath);
+    
+    // Store the original content before modification
+    if (!this.#modifiedFiles.has(fullPath)) {
+      const existingFile = this.getFile(fullPath);
+      if (existingFile) {
+        this.#modifiedFiles.set(fullPath, existingFile.content);
+      } else {
+        this.#modifiedFiles.set(fullPath, ''); // New file
+      }
+    }
+
+    // Update the files store
+    this.files.setKey(fullPath, {
+      type: 'file',
+      content,
+      isBinary: false
+    });
+
+    this.#size++;
   }
 
   async #init() {

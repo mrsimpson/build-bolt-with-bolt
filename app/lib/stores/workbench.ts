@@ -11,9 +11,10 @@ import { PreviewsStore } from './previews';
 import { TerminalStore } from './terminal';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { Octokit, type RestEndpointMethodTypes } from '@octokit/rest';
+import { Octokit, type RestEndpointMethodTypes } from "@octokit/rest";
 import * as nodePath from 'node:path';
 import type { WebContainerProcess } from '@webcontainer/api';
+import ignore from 'ignore';
 
 export interface ArtifactState {
   id: string;
@@ -275,21 +276,16 @@ export class WorkbenchStore {
     if (!artifact) {
       unreachable('Artifact not found');
     }
-
     if (data.action.type === 'file') {
-      const wc = await webcontainer;
+      let wc = await webcontainer
       const fullPath = nodePath.join(wc.workdir, data.action.filePath);
-
       if (this.selectedFile.value !== fullPath) {
         this.setSelectedFile(fullPath);
       }
-
       if (this.currentView.value !== 'code') {
         this.currentView.set('code');
       }
-
       const doc = this.#editorStore.documents.get()[fullPath];
-
       if (!doc) {
         await artifact.runner.runAction(data, isStreaming);
       }
@@ -372,10 +368,36 @@ export class WorkbenchStore {
 
   async loadFromFileSystem(sourceHandle: FileSystemDirectoryHandle) {
     const wc = await webcontainer;
+    let gitignoreContent = '';
+    let ig = ignore();
 
-    const processDirectory = async (handle: FileSystemDirectoryHandle, currentPath: string = '') => {
+    try {
+      // Try to read .gitignore if it exists
+      const gitignoreHandle = await sourceHandle.getFileHandle('.gitignore');
+      const file = await gitignoreHandle.getFile();
+      gitignoreContent = await file.text();
+      ig = ignore().add(gitignoreContent);
+    } catch (error) {
+      // .gitignore doesn't exist, use default ignores
+      ig = ignore().add([
+        'node_modules',
+        '.git',
+        'dist',
+        'build',
+        '.cache',
+        '*.log',
+        '.DS_Store'
+      ]);
+    }
+
+    async function processDirectory(handle: FileSystemDirectoryHandle, currentPath: string = '') {
       for await (const entry of handle.values()) {
         const entryPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+
+        // Check if the file should be ignored
+        if (ig.ignores(entryPath)) {
+          continue;
+        }
 
         if (entry.kind === 'file') {
           const file = await entry.getFile();
@@ -383,22 +405,23 @@ export class WorkbenchStore {
 
           // Create necessary directories
           const dirPath = nodePath.dirname(entryPath);
-
           if (dirPath !== '.') {
             await wc.fs.mkdir(dirPath, { recursive: true });
           }
 
-          // Write file content and track modification
+          // Write file content
           await wc.fs.writeFile(entryPath, content);
-          this.#filesStore.trackFileModification(entryPath, ''); // Track as new file
+
+          // Track the file in the files store
+          await this.#filesStore.trackLoadedFile(entryPath, content);
         } else if (entry.kind === 'directory') {
           await wc.fs.mkdir(entryPath, { recursive: true });
-          await processDirectory(entry, entryPath);
+          await processDirectory.call(this, entry, entryPath);
         }
       }
-    };
+    }
 
-    await processDirectory(sourceHandle);
+    await processDirectory.call(this, sourceHandle);
   }
 
   async pushToGitHub(repoName: string, githubUsername: string, ghToken: string) {
@@ -416,11 +439,10 @@ export class WorkbenchStore {
       const octokit = new Octokit({ auth: githubToken });
 
       // Check if the repository already exists before creating it
-      let repo: RestEndpointMethodTypes['repos']['get']['response']['data'];
-
+      let repo: RestEndpointMethodTypes["repos"]["get"]["response"]['data']
       try {
-        const resp = await octokit.repos.get({ owner, repo: repoName });
-        repo = resp.data;
+        let resp = await octokit.repos.get({ owner: owner, repo: repoName });
+        repo = resp.data
       } catch (error) {
         if (error instanceof Error && 'status' in error && error.status === 404) {
           // Repository doesn't exist, so create a new one
@@ -438,7 +460,6 @@ export class WorkbenchStore {
 
       // Get all files
       const files = this.files.get();
-
       if (!files || Object.keys(files).length === 0) {
         throw new Error('No files found to push');
       }
@@ -455,7 +476,7 @@ export class WorkbenchStore {
             });
             return { path: filePath.replace(/^\/home\/project\//, ''), sha: blob.sha };
           }
-        }),
+        })
       );
 
       const validBlobs = blobs.filter(Boolean); // Filter out any undefined blobs
