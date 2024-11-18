@@ -1,5 +1,3 @@
-// @ts-nocheck
-// Preventing TS checks with files presented in the video for a better presentation.
 import { useStore } from '@nanostores/react';
 import type { Message } from 'ai';
 import { useChat } from 'ai/react';
@@ -93,11 +91,13 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
   const { messages, isLoading, input, handleInputChange, setInput, stop, append } = useChat({
     api: '/api/chat',
     body: {
-      apiKeys
+      apiKeys,
     },
     onError: (error) => {
       logger.error('Request failed\n\n', error);
-      toast.error('There was an error processing your request: ' + (error.message ? error.message : "No details were returned"));
+      toast.error(
+        'There was an error processing your request: ' + (error.message ? error.message : 'No details were returned'),
+      );
     },
     onFinish: () => {
       logger.debug('Finished streaming');
@@ -218,6 +218,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
 
   useEffect(() => {
     const storedApiKeys = Cookies.get('apiKeys');
+
     if (storedApiKeys) {
       setApiKeys(JSON.parse(storedApiKeys));
     }
@@ -271,7 +272,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
           },
           model,
           provider,
-          apiKeys
+          apiKeys,
         );
       }}
     />
