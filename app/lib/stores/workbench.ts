@@ -15,6 +15,7 @@ import { Octokit, type RestEndpointMethodTypes } from "@octokit/rest";
 import * as nodePath from 'node:path';
 import type { WebContainerProcess } from '@webcontainer/api';
 import { extractRelativePath } from '~/utils/diff';
+import ignore from 'ignore';
 
 export interface ArtifactState {
   id: string;
@@ -96,7 +97,6 @@ export class WorkbenchStore {
     this.#terminalStore.attachTerminal(terminal);
   }
   attachBoltTerminal(terminal: ITerminal) {
-
     this.#terminalStore.attachBoltTerminal(terminal);
   }
 
@@ -229,7 +229,7 @@ export class WorkbenchStore {
   }
 
   abortAllActions() {
-    // TODO: what do we wanna do and how do we wanna recover from this?
+    // tODO: what do we wanna do and how do we wanna recover from this?
   }
 
   addArtifact({ messageId, title, id }: ArtifactCallbackData) {
@@ -381,10 +381,67 @@ export class WorkbenchStore {
     return syncedFiles;
   }
 
-  async pushToGitHub(repoName: string, githubUsername: string, ghToken: string) {
+  async loadFromFileSystem(sourceHandle: FileSystemDirectoryHandle) {
+    const wc = await webcontainer;
+    let gitignoreContent = '';
+    let ig = ignore();
 
     try {
-      // Get the GitHub auth token from environment variables
+      // try to read .gitignore if it exists
+      const gitignoreHandle = await sourceHandle.getFileHandle('.gitignore');
+      const file = await gitignoreHandle.getFile();
+      gitignoreContent = await file.text();
+      ig = ignore().add(gitignoreContent);
+    } catch (error) {
+      // .gitignore doesn't exist, use default ignores
+      ig = ignore().add([
+        'node_modules',
+        '.git',
+        'dist',
+        'build',
+        '.cache',
+        '*.log',
+        '.DS_Store'
+      ]);
+    }
+
+    async function processDirectory(handle: FileSystemDirectoryHandle, currentPath: string = '') {
+      for await (const entry of handle.values()) {
+        const entryPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+
+        // check if the file should be ignored
+        if (ig.ignores(entryPath)) {
+          continue;
+        }
+
+        if (entry.kind === 'file') {
+          const file = await entry.getFile();
+          const content = await file.text();
+
+          // create necessary directories
+          const dirPath = nodePath.dirname(entryPath);
+          if (dirPath !== '.') {
+            await wc.fs.mkdir(dirPath, { recursive: true });
+          }
+
+          // write file content
+          await wc.fs.writeFile(entryPath, content);
+
+          // track the file in the files store
+          await this.#filesStore.trackLoadedFile(entryPath, content);
+        } else if (entry.kind === 'directory') {
+          await wc.fs.mkdir(entryPath, { recursive: true });
+          await processDirectory.call(this, entry, entryPath);
+        }
+      }
+    }
+
+    await processDirectory.call(this, sourceHandle);
+  }
+
+  async pushToGitHub(repoName: string, githubUsername: string, ghToken: string) {
+    try {
+      // get the GitHub auth token from environment variables
       const githubToken = ghToken;
 
       const owner = githubUsername;
@@ -393,17 +450,17 @@ export class WorkbenchStore {
         throw new Error('GitHub token is not set in environment variables');
       }
 
-      // Initialize Octokit with the auth token
+      // initialize Octokit with the auth token
       const octokit = new Octokit({ auth: githubToken });
 
-      // Check if the repository already exists before creating it
+      // check if the repository already exists before creating it
       let repo: RestEndpointMethodTypes["repos"]["get"]["response"]['data']
       try {
         let resp = await octokit.repos.get({ owner: owner, repo: repoName });
         repo = resp.data
       } catch (error) {
         if (error instanceof Error && 'status' in error && error.status === 404) {
-          // Repository doesn't exist, so create a new one
+          // repository doesn't exist, so create a new one
           const { data: newRepo } = await octokit.repos.createForAuthenticatedUser({
             name: repoName,
             private: false,
@@ -412,17 +469,17 @@ export class WorkbenchStore {
           repo = newRepo;
         } else {
           console.log('cannot create repo!');
-          throw error; // Some other error occurred
+          throw error; // some other error occurred
         }
       }
 
-      // Get all files
+      // get all files
       const files = this.files.get();
       if (!files || Object.keys(files).length === 0) {
         throw new Error('No files found to push');
       }
 
-      // Create blobs for each file
+      // create blobs for each file
       const blobs = await Promise.all(
         Object.entries(files).map(async ([filePath, dirent]) => {
           if (dirent?.type === 'file' && dirent.content) {
@@ -437,21 +494,21 @@ export class WorkbenchStore {
         })
       );
 
-      const validBlobs = blobs.filter(Boolean); // Filter out any undefined blobs
+      const validBlobs = blobs.filter(Boolean); // filter out any undefined blobs
 
       if (validBlobs.length === 0) {
         throw new Error('No valid files to push');
       }
 
-      // Get the latest commit SHA (assuming main branch, update dynamically if needed)
+      // get the latest commit SHA (assuming main branch, update dynamically if needed)
       const { data: ref } = await octokit.git.getRef({
         owner: repo.owner.login,
         repo: repo.name,
-        ref: `heads/${repo.default_branch || 'main'}`, // Handle dynamic branch
+        ref: `heads/${repo.default_branch || 'main'}`, // handle dynamic branch
       });
       const latestCommitSha = ref.object.sha;
 
-      // Create a new tree
+      // create a new tree
       const { data: newTree } = await octokit.git.createTree({
         owner: repo.owner.login,
         repo: repo.name,
@@ -464,7 +521,7 @@ export class WorkbenchStore {
         })),
       });
 
-      // Create a new commit
+      // create a new commit
       const { data: newCommit } = await octokit.git.createCommit({
         owner: repo.owner.login,
         repo: repo.name,
@@ -473,11 +530,11 @@ export class WorkbenchStore {
         parents: [latestCommitSha],
       });
 
-      // Update the reference
+      // update the reference
       await octokit.git.updateRef({
         owner: repo.owner.login,
         repo: repo.name,
-        ref: `heads/${repo.default_branch || 'main'}`, // Handle dynamic branch
+        ref: `heads/${repo.default_branch || 'main'}`, // handle dynamic branch
         sha: newCommit.sha,
       });
 
