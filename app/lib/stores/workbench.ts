@@ -395,22 +395,19 @@ export class WorkbenchStore {
       const file = await gitignoreHandle.getFile();
       gitignoreContent = await file.text();
       ig = ignore().add(gitignoreContent);
-    } catch (error) {
+    } catch {
       // .gitignore doesn't exist, use default ignores
-      ig = ignore().add([
-        'node_modules',
-        '.git',
-        'dist',
-        'build',
-        '.cache',
-        '*.log',
-        '.DS_Store'
-      ]);
+      ig = ignore().add(['node_modules', '.git', 'dist', 'build', '.cache', '*.log', '.DS_Store']);
     }
 
-    async function processDirectory(handle: FileSystemDirectoryHandle, currentPath: string = '') {
+    async function processDirectory(
+      this: WorkbenchStore,
+      handle: FileSystemDirectoryHandle,
+      currentPath: string = '',
+    ): Promise<void> {
+      // @ts-ignore-next-line
       for await (const entry of handle.values()) {
-        const entryPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+        const entryPath = currentPath ? `${currentPath}/${entry[0]}` : entry[0];
 
         // check if the file should be ignored
         if (ig.ignores(entryPath)) {
@@ -423,6 +420,7 @@ export class WorkbenchStore {
 
           // create necessary directories
           const dirPath = nodePath.dirname(entryPath);
+
           if (dirPath !== '.') {
             await wc.fs.mkdir(dirPath, { recursive: true });
           }
@@ -443,7 +441,6 @@ export class WorkbenchStore {
   }
 
   async pushToGitHub(repoName: string, githubUsername: string, ghToken: string) {
-
     try {
       // Get the GitHub auth token from environment variables
       const githubToken = ghToken;

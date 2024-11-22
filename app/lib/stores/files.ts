@@ -116,10 +116,11 @@ export class FilesStore {
   async trackLoadedFile(filePath: string, content: string) {
     const webcontainer = await this.#webcontainer;
     const fullPath = nodePath.join(webcontainer.workdir, filePath);
-    
+
     // Store the original content before modification
     if (!this.#modifiedFiles.has(fullPath)) {
       const existingFile = this.getFile(fullPath);
+
       if (existingFile) {
         this.#modifiedFiles.set(fullPath, existingFile.content);
       } else {
@@ -131,7 +132,7 @@ export class FilesStore {
     this.files.setKey(fullPath, {
       type: 'file',
       content,
-      isBinary: false
+      isBinary: false,
     });
 
     this.#size++;
