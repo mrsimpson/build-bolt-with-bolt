@@ -1,3 +1,7 @@
+/*
+ * @ts-nocheck
+ * Preventing TS checks with files presented in the video for a better presentation.
+ */
 import { useStore } from '@nanostores/react';
 import type { Message } from 'ai';
 import { useChat } from 'ai/react';
@@ -79,7 +83,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
   });
   const [provider, setProvider] = useState(() => {
     const savedProvider = Cookies.get('selectedProvider');
-    return PROVIDER_LIST.find(p => p.name === savedProvider) || DEFAULT_PROVIDER;
+    return PROVIDER_LIST.find((p) => p.name === savedProvider) || DEFAULT_PROVIDER;
   });
 
   const { showChat } = useStore(chatStore);
