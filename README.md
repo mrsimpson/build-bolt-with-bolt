@@ -1,7 +1,7 @@
 # OttoDev – playground
 
-This fork of the fork of bolt.new is a playground for evaluatoin of how to better manage the development of ottoDev with a larger, loosely coupled community of developers.
-Ideally, the epics, issues and projects from this repository will be transfered to an organization where ottoDev resides.
+This fork of the fork of bolt.new is a playground for evaluation of how to better manage the development of ottoDev with a larger, loosely coupled community of developers.
+Ideally, the epics, issues and projects from this repository will be transfered to an organization where ottoDev resides lateron.
 
 # Vision
 
