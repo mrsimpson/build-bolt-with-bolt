@@ -20,6 +20,6 @@ An epic denotes an area in which multiple features or improvements need to be ma
 
 ## Issues
 
-All *features* that are being worked on should be assigned to an epic. They are prioitized by the core team. If you feel comfortable working on them, please have a look at the [architectural map](./todo) and the [developer guidelines](./todo) so that we can easily review and merge your PR!
+All *features* that are being worked on should be assigned to an epic. They are prioitized by the core team. If you feel comfortable working on them, please have a look at the [architectural map](./docs/docs/architecture-map.md) and the [developer guidelines](./docs/docs/developer-guidelines.md) so that we can easily review and merge your PR!
 
 All *bugs* are identifyable using the the [bug-label](https://github.com/mrsimpson/bolt.new-any-llm/labels/bug). If it's your first contribution, you may check [good first issues](https://github.com/mrsimpson/bolt.new-any-llm/labels/good%20first%20issue)
