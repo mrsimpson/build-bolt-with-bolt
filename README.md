@@ -11,6 +11,8 @@ OttoDev is the chat-first IDE in your browser. Based on the awesome ideas from b
 
 To get a transparent idea of what's going on, check the [project board](https://github.com/users/mrsimpson/projects/2) . It provides you with an idea on what the core team members are currently focusing.
 
+# Contributions
+
 Want to get involved? Then check where we need improvements to be made.
 
 ## Epics
