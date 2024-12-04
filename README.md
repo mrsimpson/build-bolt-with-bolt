@@ -11,9 +11,13 @@ OttoDev is the chat-first IDE in your browser. Based on the awesome ideas from b
 
 To get a transparent idea of what's going on, check the [project board](https://github.com/users/mrsimpson/projects/2) . It provides you with an idea on what the core team members are currently focusing.
 
+Want to know how we schedule development of new features? Check the [roadmap](https://github.com/users/mrsimpson/projects/2/views/4)
+
+Please keep in mind that we don't commit to any timelines! It's just an illustration of the order in which we'd consider it reasonable to work particular areas.
+
 # Contributions
 
-Want to get involved? Then check where we need improvements to be made.
+Want to get involved? This is how we organize our backlog:
 
 ## Epics
 
